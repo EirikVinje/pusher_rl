@@ -11,10 +11,11 @@ pip install -r requirements.txt
 ```
 
 ### Fix small uncommited bug in gymnasium
+Head to:
 ```bash
 cd /home/<user>/anaconda3/envs/rl/lib/python3.10/site-packages/gymnasium/envs/mujoco/
 ```
-Head to **mujoco_rendering.py** and edit line 593 from:
+Open **mujoco_rendering.py** and edit line 593 from:
 ```pyton
 bottomleft, "Solver iterations", str(self.data.solver_iter + 1)
 ```
