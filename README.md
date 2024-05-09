@@ -16,7 +16,7 @@ Head to:
 cd /home/<user>/anaconda3/envs/rl/lib/python3.10/site-packages/gymnasium/envs/mujoco/
 ```
 Open **mujoco_rendering.py** and edit line 593 from:
-```pyton
+```python
 bottomleft, "Solver iterations", str(self.data.solver_iter + 1)
 ```
 to
