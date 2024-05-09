@@ -5,10 +5,12 @@ This repository holds the code for the reinforcement learning project. The envir
 
 ## Before running project
 
+### Install dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
+### Fix small uncommited bug in gymnasium
 ```bash
 cd /home/<user>/anaconda3/envs/rl/lib/python3.10/site-packages/gymnasium/envs/mujoco/
 ```
