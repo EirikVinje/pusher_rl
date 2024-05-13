@@ -17,8 +17,10 @@ class OrnsteinUhlenbeckProcess:
         self.sigma = sigma
         self.reset()
 
+
     def reset(self):
         self.state = np.zeros(self.size)
+
 
     def sample(self):
         x = self.state
@@ -42,6 +44,7 @@ class ActorNetwork(nn.Module):
             nn.Tanh() 
         )
 
+
     def forward(self, x):
         
         x = self.net(x)
@@ -60,6 +63,7 @@ class CriticNetwork(nn.Module):
         self.hidden2 = nn.Linear(128, 128)
 
         self.output = nn.Linear(128, 1)
+
 
     def forward(self, state, action):
         
@@ -80,9 +84,11 @@ class Memory:
     def __init__(self, capacity):
         self.memory = deque([], maxlen=capacity)
 
+
     def add(self, state_i1, action_i, state_i2, reward):
         self.memory.append([state_i1, action_i, state_i2, reward])
     
+
     def sample(self, batch_size):
         
         if batch_size > self.size():
@@ -104,6 +110,7 @@ class Memory:
 
         return [states, actions, next_states, rewards]
     
+
     def size(self):
         return len(self.memory)
     
@@ -302,8 +309,10 @@ class Pusher:
             
             self.noise_process.reset()
 
-            if i % self.save_n == 0 and i != 0:
-                self._save_model(epoch=i)
+            if (i+1) % self.save_n == 0 and i != 0:
+                self._save_model(epoch=i+1)
+
+        # self._save_model(epoch=self.epochs)
 
 
 if __name__ == "__main__":
