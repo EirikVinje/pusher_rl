@@ -5,7 +5,7 @@ This repository holds the code for the reinforcement learning project. The envir
 
 ## Before running project
 
-### Create new conda environment (preferable)
+### Use Anaconda (preferable)
 ```bash
 conda create --name pusher python==3.10
 conda activate pusher
