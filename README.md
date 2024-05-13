@@ -3,6 +3,27 @@ This repository holds the code for the reinforcement learning project. The envir
 
 “Pusher” is a multi-jointed robot arm which is very similar to that of a human. The goal is to move a target cylinder (called object) to a goal position using the robot’s end effector (called fingertip). The robot consists of shoulder, elbow, forearm, and wrist joints.
 
+### Psudocode:
+1. **Initialization**:
+- Set networks - actor : $\theta$, critic $\sigma$, actor target $\theta_t$  and critic network $\sigma_t$
+    - copy weights , $\theta$ $\to$ $\theta_t$ and $\sigma$ $\to$ $\sigma_t$
+- Set replay memory
+    - Should have queue datatype 
+
+- Set single loss function and two optimizers, for $\theta$ and $\sigma$
+
+2. **For each episode e**:
+
+- initialize episode with state = env.reset()
+
+    3. **For each step s in e**:
+    - input state in actor net and get next action
+    - input action in env and get next state and reward
+    - Add to replay memory, (state, action, next_state, reward)
+.
+.
+.
+
 ## Before running project
 
 ### Use Anaconda (preferable)
