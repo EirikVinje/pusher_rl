@@ -9,6 +9,10 @@ This repository holds the code for the reinforcement learning project. The envir
 ```bash
 pip install -r requirements.txt
 ```
+### If libGL error encounter, run:
+```bash
+conda install -c conda-forge libstdcxx-ng
+```
 
 ### Fix small uncommited bug in gymnasium
 Head to:
