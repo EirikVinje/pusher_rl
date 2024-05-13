@@ -5,6 +5,11 @@ This repository holds the code for the reinforcement learning project. The envir
 
 ## Before running project
 
+### Install PyTorch
+```bash
+pip install torch
+```
+
 ### Install dependencies
 ```bash
 pip install -r requirements.txt
