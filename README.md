@@ -8,6 +8,7 @@ This repository holds the code for the reinforcement learning project. The envir
 ### Create new conda environment (preferable)
 ```bash
 conda create --name pusher python==3.10
+conda activate pusher
 ```
 
 ### Install PyTorch
