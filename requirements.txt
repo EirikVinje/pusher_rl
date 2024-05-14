@@ -6,10 +6,10 @@ etils==1.7.0
 Farama-Notifications==0.0.4
 fsspec==2024.3.1
 glfw==2.7.0
-gymnasium==0.29.1
+gymnasium==0.27.1
 imageio==2.34.1
 importlib_resources==6.4.0
-mujoco==3.1.5
+mujoco==2.3.1
 numpy==1.26.4
 pillow==10.3.0
 pip==24.0
