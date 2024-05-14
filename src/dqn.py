@@ -7,7 +7,12 @@ import gymnasium as gym
 from tqdm import tqdm
 import torch.nn as nn
 import numpy as np
+import mujoco
 import torch
+
+print("mujoco version: ", mujoco.__version__)
+print("gym version: ", gym.__version__)
+
 
 
 class OrnsteinUhlenbeckProcess:
@@ -127,7 +132,7 @@ class Pusher:
                  max_steps : int = 200, 
                  tau : float = 0.001, 
                  gamma : float = 0.90,
-                 memory_size : int = 10_000,
+                 memory_size : int = 5000,
                  checkpoint = None):
         
         self.save_n = save_n
@@ -198,7 +203,7 @@ class Pusher:
 
     def _reset_env(self):
 
-        state, _ = self.env.reset(seed=self.seed)
+        state, _ = self.env.reset()
         return state
 
 
