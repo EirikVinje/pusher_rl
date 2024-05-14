@@ -9,6 +9,8 @@ This repository holds the code for the reinforcement learning project. The envir
 ## Deep Deterministic Policy Gradient (DDPG)
 For this project we are using DDPG. Below is the psudocode used when implementing DDPG.
 
+![Alt text](docs/psudocode.png)
+
 
 ## Before running project
 
