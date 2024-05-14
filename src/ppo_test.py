@@ -14,7 +14,7 @@ eval_env = gym.make("Pusher-v4",render_mode="human")
 checkpoint = load_from_hub(repo_id, filename)
 model = PPO.load(checkpoint,env=eval_env,print_system_info=True)
 
-mean_reward, std_reward = evaluate_policy(model,eval_env, n_eval_episodes=10, deterministic=True)
+mean_reward, std_reward = evaluate_policy(model,eval_env, n_eval_episodes=5, deterministic=True)
 print(f"mean_reward={mean_reward:.2f} +/- {std_reward}")
 
 # Enjoy trained agent
