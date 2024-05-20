@@ -8,7 +8,7 @@ import torch
 from ddpg import ActorNetwork
 
 class Model:
-    def __init__(self, path_model, device="cuda"):
+    def __init__(self, path_model, device="cpu"):
         
         user = os.environ.get("USER")
         root = f"/home/{user}/data/pusher_models/"
@@ -21,13 +21,13 @@ class Model:
         self.device = device
 
         self.net = ActorNetwork().to(self.device)
-        self.net.load_state_dict(torch.load(path_model))
+        self.net.load_state_dict(torch.load(path_model,map_location=torch.device('cpu')))
         self.net.eval()
 
     def test(self):
 
-        stest = [3559, 3216, 7890, 5242, 4924, 3588, 722, 8119]
         stest = [710, 0, 5, 11, 14, 23]
+        stest = [3559, 3216, 7890, 5242, 4924, 3588, 722, 8119]
 
         seeds = np.random.choice(10000, 8, replace=False)
         # seeds = range(100)

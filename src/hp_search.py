@@ -27,7 +27,12 @@ def objective(trial, args):
                     epochs=epochs,
                     batch_size=batch_size,
                     run_name=run_name, 
-                    save_n=save_n)
+                    save_n=save_n,
+                    lr=lr,
+                    max_steps=max_steps,
+                    tau=tau,
+                    gamma=gamma,
+                    memory_size=memory_size)
     
     pusher.train()
 
