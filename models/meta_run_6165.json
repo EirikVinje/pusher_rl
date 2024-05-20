@@ -1,0 +1,1 @@
+{"seed": -1, "device": "cuda", "save_n": 10000, "epochs": 100000, "batch_size": 64, "steps": 500, "lr": 0.0001, "tau": 0.001, "gamma": 0.9, "memory_size": 10000}
