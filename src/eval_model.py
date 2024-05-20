@@ -3,7 +3,7 @@ import argparse
 import torch
 import os
 
-from dqn import ActorNetwork
+from ddpg import ActorNetwork
 
 
 class Model:
