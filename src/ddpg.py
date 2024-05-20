@@ -224,26 +224,6 @@ class Pusher:
             return state
 
 
-    def _plot(self, actor_loss, critic_loss, rewards):
-
-        fig, axs = plt.subplots(3)
-
-        axs[0].plot(actor_loss)
-        axs[0].set_ylabel('Actor Loss')
-        axs[0].set_xlabel('Episode')
-
-        axs[1].plot(critic_loss)
-        axs[1].set_ylabel('Critic Loss')
-        axs[1].set_xlabel('Episode')
-
-        # Plot rewards
-        axs[2].plot(rewards)
-        axs[2].set_ylabel('Rewards')
-        axs[2].set_xlabel('Episode')
-
-        plt.savefig(os.path.join(self.rundir, f"train_{self.run_name}.png"))
-
-
     def action(self, state, add_noise=True):
 
         state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
@@ -304,6 +284,7 @@ class Pusher:
         model_path = os.path.join(self.rundir, f"{self.run_name}_{epoch}.pt")
         torch.save(self.actor_net.state_dict(), model_path)
 
+    
     def _init_csv(self):
 
         self.csv_file = os.path.join(self.rundir, f"{self.run_name}_metrics.csv")
@@ -312,14 +293,21 @@ class Pusher:
             writer = csv.writer(file)
             headers = ['actor_loss', 'critic_loss', 'rewards'] 
             writer.writerow(headers)
-            
+
+    
+    def _write_csv(self, actor_loss, critic_loss, reward):
+
+        with open(self.csv_file, 'a', newline='') as file:
+            writer = csv.writer(file) 
+            writer.writerow([actor_loss, critic_loss, reward])
+        
 
     def test(self):
         
         total_rewards = 0
         state = self._reset_env()
 
-        for _ in range(1000):
+        while True:
 
             action = self.action(state, add_noise=False)
 
@@ -334,10 +322,6 @@ class Pusher:
     
 
     def train(self):
-
-        total_critic_loss = []
-        total_actor_loss = []
-        total_rewards = []
 
         self._init_csv()
 
@@ -393,16 +377,9 @@ class Pusher:
                         param.data.copy_(self.tau * current_params[name].data + (1 - self.tau) * param.data)
 
             
-            with open(self.csv_file, 'a', newline='') as file:
-                writer = csv.writer(file)
-                reward = self.test()
-                data = [actor_loss, critic_loss, reward]
-                writer.writerow(data)
-                
-            # if (i+1) % self.save_n == 0 and i != 0:
-                # self._save_model(epoch=i+1)
+            self._write_csv(actor_loss, critic_loss, self.test())
+            
 
-        # self._plot(total_actor_loss, total_critic_loss, total_rewards)
 
 
 if __name__ == "__main__":
