@@ -20,3 +20,4 @@ swig==4.2.1
 typing_extensions==4.11.0
 wheel==0.43.0
 zipp==3.18.1
+matplotlib==3.9.0
