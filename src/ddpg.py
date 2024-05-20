@@ -173,7 +173,7 @@ class Pusher:
 
         self.actor_optimizer = torch.optim.Adam(params=self.actor_net.parameters(), lr=lr)
         self.critic_optimizer = torch.optim.Adam(params=self.critic_net.parameters(), lr=lr)
-        self.critic_criterion = nn.MSELoss()
+        self.mseloss = nn.MSELoss()
 
         self.noise_process = OrnsteinUhlenbeckProcess(size=self.n_action, theta=0.15, sigma=0.2)
 
@@ -266,7 +266,7 @@ class Pusher:
         # critic loss 
         self.critic_optimizer.zero_grad()
         pred_Q = self.critic_net(states, actions)
-        critic_loss = self.critic_criterion(pred_Q, target_Q)
+        critic_loss = self.mseloss(pred_Q, target_Q)
         critic_loss.backward()
         self.critic_optimizer.step()
         
@@ -352,10 +352,7 @@ class Pusher:
 
                 # move to next state
                 state = next_state
-
-                if state is None:
-                    break
-
+                
                 batch = self.memory.sample(self.batch_size)
                 
                 if batch is not None:
@@ -376,6 +373,11 @@ class Pusher:
                     for name, param in target_params.items():
                         param.data.copy_(self.tau * current_params[name].data + (1 - self.tau) * param.data)
 
+                if state is None:
+                    break
+
+            if i % self.save_n == 0 and i != 0:
+                self._save_model(epoch=i)
             
             self._write_csv(actor_loss, critic_loss, self.test())
             
