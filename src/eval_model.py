@@ -57,7 +57,7 @@ class Model:
         print(f"Cumulative rewards: {cum_rewards}")
         print(f"Mean cum reward: {sum(cum_rewards)/len(cum_rewards)}")
         self.env.close()
-
+        return sum(cum_rewards)/len(cum_rewards)
 
 if __name__ == "__main__":
     
