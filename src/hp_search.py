@@ -1,7 +1,7 @@
 import os
 import argparse
 import optuna
-from dqn import Pusher
+from ddpg import Pusher
 from eval_model import Model
 
 def objective(trial, args):
