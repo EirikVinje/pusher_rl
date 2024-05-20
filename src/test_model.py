@@ -1,10 +1,11 @@
-import gymnasium as gym
-import argparse
-import torch
 import os
+import argparse
 
-from dqn import ActorNetwork
+import gymnasium as gym
+import numpy as np
+import torch
 
+from ddpg import ActorNetwork
 
 class Model:
     def __init__(self, path_model, device="cuda"):
@@ -13,36 +14,48 @@ class Model:
         root = f"/home/{user}/data/pusher_models/"
         path_model = os.path.join(root, path_model)
 
-        self.env = gym.make("Pusher-v4", 
-                            render_mode="human", 
-                            max_episode_steps=200)
+        self.max_steps = 200
+
+        self.env = gym.make("Pusher-v4", render_mode="human", max_episode_steps=self.max_steps)
 
         self.device = device
 
         self.net = ActorNetwork().to(self.device)
         self.net.load_state_dict(torch.load(path_model))
+        self.net.eval()
 
-    def test(self, seed=42):
+    def test(self):
+
+        stest = [3559, 3216, 7890, 5242, 4924, 3588, 722, 8119]
+        stest = [710, 0, 5, 11, 14, 23]
+
+        seeds = np.random.choice(10000, 8, replace=False)
+        # seeds = range(100)
+
+        seeds = stest
         
-        state, info = self.env.reset(seed=seed)
-
-        state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
-
-        for _ in range(1000):
+        for seed in seeds:
             
-            action = self.net(state)
+            print(seed)
 
-            if self.device == "cpu":
-                action = action.detach().numpy().reshape(7,)
-            elif self.device == "cuda":
-                action = action.detach().cpu().numpy().reshape(7,)
-
-            state, reward, terminated, truncated, info = self.env.step(action)
-
-            if terminated or truncated:
-                state, info = self.env.reset(seed=42)
-
+            state, info = self.env.reset(seed=int(seed))
             state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
+ 
+            while True:
+
+                action = self.net(state)
+
+                if self.device == "cpu":
+                    action = action.detach().numpy().reshape(7,)
+                elif self.device == "cuda":
+                    action = action.detach().cpu().numpy().reshape(7,)
+
+                state, reward, terminated, truncated, info = self.env.step(action)
+
+                if terminated or truncated:
+                    break
+
+                state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
 
         self.env.close()
 
