@@ -19,12 +19,28 @@ vec_env = make_vec_env("Pusher-v4", n_envs=1)
             max_grad_norm=0.9,
             vf_coef=0.950368)'''
 
-#model.learn(total_timesteps=1_000_000,log_interval=10,progress_bar=True)
-#model.save("ppo_cartpole_1M")
+params = {'n_steps': 878, 'gamma': 0.8680218654215721, 'learning_rate': 0.00017445135385783767, 'ent_coef': 0.0011388540424663318, 'clip_range': 0.1964158980973974, 'n_epochs': 8, 'gae_lambda': 0.8124992408081275, 'max_grad_norm': 0.9961750824042535, 'vf_coef': 0.7726884965404387}
+
+model = PPO("MlpPolicy", vec_env, 
+            verbose=1,
+            batch_size=32,
+            n_steps=params['n_steps'],
+            gamma=params['gamma'],
+            learning_rate=params['learning_rate'],
+            ent_coef=params['ent_coef'],
+            clip_range=params['clip_range'],
+            n_epochs=params['n_epochs'],
+            gae_lambda=params['gae_lambda'],
+            max_grad_norm=params['max_grad_norm'],
+            vf_coef=params['vf_coef'],
+            tensorboard_log="./ppo_tensorboard_log/")
+
+model.learn(total_timesteps=1_000_000,log_interval=10,progress_bar=True)
+model.save("ppo_cartpole_1M")
 
 #del model # remove to demonstrate saving and loading
 
-model = PPO.load("ppo_cartpole_1M")
+#model = PPO.load("ppo_cartpole_1M")
 
 
 seeds = [3559, 3216, 7890, 5242, 4924, 3588, 722, 8119]

@@ -1,5 +1,6 @@
 import os
 import optuna
+import pickle
 import gymnasium as gym
 
 from stable_baselines3 import PPO
@@ -10,13 +11,13 @@ def objective(trial):
 
     n_steps = trial.suggest_int("n_steps", 256, 1024)
     gamma = trial.suggest_float("gamma", 0.5, 1.0)
-    learning_rate = trial.suggest_float("learning_rate", 1e-5, 1e-1, log=True)
+    learning_rate = trial.suggest_float("learning_rate", 1e-6, 1e-3, log=True)
     ent_coef = trial.suggest_float("ent_coef", 1e-8, 1e-1, log=True)
     clip_range = trial.suggest_float("clip_range", 0.1, 0.5)
-    n_epochs = trial.suggest_int("n_epochs", 3, 10)
+    n_epochs = trial.suggest_int("n_epochs", 3, 20)
     gae_lambda = trial.suggest_float("gae_lambda", 0.5, 1.0)
-    max_grad_norm = trial.suggest_float("max_grad_norm", 0.5, 1.0)
-    vf_coef = trial.suggest_float("vf_coef", 0.5, 1.0)
+    max_grad_norm = trial.suggest_float("max_grad_norm", 0.1, 1.0)
+    vf_coef = trial.suggest_float("vf_coef", 0.1, 1.0)
 
     vec_env = make_vec_env("Pusher-v4", n_envs=1)
     model = PPO("MlpPolicy", vec_env, 
@@ -35,6 +36,10 @@ def objective(trial):
     model.learn(total_timesteps=100_000,log_interval=10,progress_bar=True)
 
     res = test(vec_env, model)
+
+    if res > -55:
+        model.learn(total_timesteps=900_000,log_interval=10,progress_bar=True)
+        res = test(vec_env, model)
     
     return res
 
@@ -72,6 +77,8 @@ if __name__ == "__main__":
     print(study.best_params)
     print(study.best_value)
     print(study.best_trial)
+    pickle.dump(study, open("ppo_hp_study.pkl", "wb"))
+
 
     
 
