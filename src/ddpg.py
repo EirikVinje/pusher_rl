@@ -1,6 +1,7 @@
 from collections import deque
 import argparse
 import json
+import csv
 import os
 
 # from twilio.rest import Client
@@ -303,6 +304,15 @@ class Pusher:
         model_path = os.path.join(self.rundir, f"{self.run_name}_{epoch}.pt")
         torch.save(self.actor_net.state_dict(), model_path)
 
+    def _init_csv(self):
+
+        self.csv_file = os.path.join(self.rundir, f"{self.run_name}_metrics.csv")
+
+        with open(self.csv_file, 'w', newline='') as file:  
+            writer = csv.writer(file)
+            headers = ['actor_loss', 'critic_loss', 'rewards'] 
+            writer.writerow(headers)
+            
 
     def test(self):
         
@@ -328,6 +338,8 @@ class Pusher:
         total_critic_loss = []
         total_actor_loss = []
         total_rewards = []
+
+        self._init_csv()
 
         for i in tqdm(range(self.epochs), desc="Episode"):
 
@@ -380,15 +392,17 @@ class Pusher:
                     for name, param in target_params.items():
                         param.data.copy_(self.tau * current_params[name].data + (1 - self.tau) * param.data)
 
-            total_actor_loss.append(actor_loss)
-            total_critic_loss.append(critic_loss)
-            reward_i = self.test()
-            total_rewards.append(reward_i)
-
+            
+            with open(self.csv_file, 'a', newline='') as file:
+                writer = csv.writer(file)
+                reward = self.test()
+                data = [actor_loss, critic_loss, reward]
+                writer.writerow(data)
+                
             # if (i+1) % self.save_n == 0 and i != 0:
                 # self._save_model(epoch=i+1)
 
-        self._plot(total_actor_loss, total_critic_loss, total_rewards)
+        # self._plot(total_actor_loss, total_critic_loss, total_rewards)
 
 
 if __name__ == "__main__":
