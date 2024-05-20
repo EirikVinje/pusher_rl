@@ -382,11 +382,11 @@ class Pusher:
 
             total_actor_loss.append(actor_loss)
             total_critic_loss.append(critic_loss)
+            reward_i = self.test()
+            total_rewards.append(reward_i)
 
-            if (i+1) % self.save_n == 0 and i != 0:
-                self._save_model(epoch=i+1)
-                reward_i = self.test()
-                total_rewards.append(reward_i)
+            # if (i+1) % self.save_n == 0 and i != 0:
+                # self._save_model(epoch=i+1)
 
         self._plot(total_actor_loss, total_critic_loss, total_rewards)
 
