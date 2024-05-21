@@ -1,4 +1,4 @@
-![Alt text](docs/pusher.png)
+![Alt text](docs/pusher.gif)
 
 
 # Pusher_reinforcement_learning
