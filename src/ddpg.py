@@ -5,11 +5,9 @@ import csv
 import os
 
 import gymnasium as gym
-import matplotlib.pyplot as plt
 from tqdm import tqdm
 import torch.nn as nn
 import numpy as np
-import mujoco
 import torch
 
 
