@@ -371,10 +371,11 @@ class Pusher:
 
                 if state is None:
                     break
-
-            if i % self.save_n == 0 and i != 0:
-                self._save_model(epoch=i)
             
+            if self.save_n != -1:
+                if i % self.save_n == 0 and i != 0:
+                    self._save_model(epoch=i)
+                
             self._write_csv(actor_loss, critic_loss, self.test())
             
 
