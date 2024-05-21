@@ -1,4 +1,6 @@
-![Alt text](docs/pusher.gif)
+<p align="center">
+  <img src="docs/pusher.gif" width="400" height="400">
+</p>
 
 
 # Pusher_reinforcement_learning
