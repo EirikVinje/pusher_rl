@@ -298,7 +298,7 @@ class Pusher:
             writer.writerow([actor_loss, critic_loss, reward])
         
 
-    def test(self):
+    def evaluate(self):
         
         rewards = []
         state = self._reset_env()
@@ -376,7 +376,7 @@ class Pusher:
                 if i % self.save_n == 0 and i != 0:
                     self._save_model(epoch=i)
                 
-            self._write_csv(actor_loss, critic_loss, self.test())
+            self._write_csv(actor_loss, critic_loss, self.evaluate())
             
 
 
