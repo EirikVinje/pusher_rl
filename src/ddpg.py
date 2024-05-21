@@ -4,7 +4,6 @@ import json
 import csv
 import os
 
-# from twilio.rest import Client
 import gymnasium as gym
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -12,9 +11,6 @@ import torch.nn as nn
 import numpy as np
 import mujoco
 import torch
-
-print("mujoco version: ", mujoco.__version__)
-print("gym version: ", gym.__version__)
 
 
 class OrnsteinUhlenbeckProcess:
@@ -304,7 +300,7 @@ class Pusher:
 
     def test(self):
         
-        total_rewards = 0
+        rewards = []
         state = self._reset_env()
 
         while True:
@@ -313,12 +309,12 @@ class Pusher:
 
             state, reward, terminated, truncated, info = self.env.step(action)
 
-            total_rewards += reward
+            rewards.append(reward)
 
             if terminated or truncated:
                 break
 
-        return total_rewards
+        return float(np.mean(rewards))
     
 
     def train(self):
@@ -421,15 +417,3 @@ if __name__ == "__main__":
                     max_episode_steps=max_episode_steps)
     
     pusher.train()
-
-    # account_sid = 'ACfbdeefa543ed244c34846d4fed762589'
-    # auth_token = '3936a80a2504c76ac8e828a8488d643b'
-    # client = Client(account_sid, auth_token)
-
-    # message = client.messages.create(
-    #     body='Training complete!',
-    #     from_='+13146268516',  # Replace with your Twilio phone number
-    #     to='+4748070250'  # Replace with your phone number
-    # )
-
-    # print(message.sid)
