@@ -12,11 +12,11 @@ import torch
 
 
 class OrnsteinUhlenbeckProcess:
-    def __init__(self, size, theta=0.15, sigma=0.2, decay_rate=0.00005):
+    def __init__(self, size):
         self.size = size
-        self.theta = theta
-        self.sigma = sigma
-        self.decay_rate = decay_rate
+        self.theta = 0.15
+        self.sigma = 0.2
+        self.decay_rate = 0.00005
         self.reset()
         self.time_step = 0
 
@@ -172,7 +172,7 @@ class Pusher:
         self.critic_optimizer = torch.optim.Adam(params=self.critic_net.parameters(), lr=lr)
         self.mseloss = nn.MSELoss()
 
-        self.noise_process = OrnsteinUhlenbeckProcess(size=self.n_action, theta=0.15, sigma=0.2)
+        self.ornstein = OrnsteinUhlenbeckProcess(size=self.n_action)
 
         user = os.environ.get("USER")
         
@@ -220,7 +220,7 @@ class Pusher:
             return state
 
 
-    def action(self, state, add_noise=True):
+    def action(self, state):
 
         state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
         
@@ -233,11 +233,9 @@ class Pusher:
         elif self.device == "cuda":
             action = action.detach().cpu().numpy().reshape(7,)
 
-        if add_noise:
-            noise = self.noise_process.sample()
-            action += noise
-            action = np.clip(action, -2, 2)
-            return action
+        noise = self.ornstein.sample()
+        action += noise
+        action = np.clip(action, -2, 2)
         
         return action
 
@@ -300,23 +298,16 @@ class Pusher:
 
     def evaluate(self):
         
-        rewards = 0
-        for i in range(10):
-        
-            state = self._reset_env(seed=i)
-            while True:
+        state = self._reset_env()
+        while True:
 
-                action = self.action(state, add_noise=False)
+            action = self.action(state, add_noise=False)
 
-                state, reward, terminated, truncated, info = self.env.step(action)
+            state, reward, terminated, truncated, info = self.env.step(action)
 
-                rewards += reward
+            if terminated or truncated:
+                return reward
 
-                if terminated or truncated:
-                    break
-
-        return rewards/10
-    
 
     def train(self):
 
@@ -325,7 +316,6 @@ class Pusher:
         for i in tqdm(range(self.epochs), desc="Episode"):
 
             state = self._reset_env()
-            self.noise_process.reset()
 
             actor_loss = 0
             critic_loss = 0
@@ -376,8 +366,10 @@ class Pusher:
             if self.save_n != -1:
                 if (i+1) % self.save_n == 0 and i != 0:
                     self._save_model(epoch=i+1)
-                
-            self._write_csv(actor_loss, critic_loss, self.evaluate())
+            
+            reward = self.evaluate()
+
+            self._write_csv(actor_loss, critic_loss, reward)
         
 
 
