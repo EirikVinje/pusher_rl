@@ -12,19 +12,24 @@ import torch
 
 
 class OrnsteinUhlenbeckProcess:
-    def __init__(self, size, theta=0.15, sigma=0.2):
+    def __init__(self, size, theta=0.15, sigma=0.2, decay_rate=0.00005):
         self.size = size
         self.theta = theta
         self.sigma = sigma
+        self.decay_rate = decay_rate
         self.reset()
+        self.time_step = 0
 
     def reset(self):
         self.state = np.zeros(self.size)
+        self.time_step = 0
 
     def sample(self):
         x = self.state
-        dx = self.theta * (np.zeros(self.size) - x) + self.sigma * np.random.randn(self.size)
+        decayed_sigma = self.sigma * np.exp(-self.decay_rate * self.time_step)
+        dx = self.theta * (np.zeros(self.size) - x) + decayed_sigma * np.random.randn(self.size)
         self.state = x + dx
+        self.time_step += 1
         return dx
 
 
@@ -122,7 +127,6 @@ class Pusher:
     def __init__(self, 
                  run_name : str,
                  save_n : int,
-                 seed : int, 
                  device : str, 
                  epochs : int, 
                  batch_size : int,
@@ -137,8 +141,7 @@ class Pusher:
         self.run_name = run_name
         self.save_n = save_n
         self.device = device
-        self.seed = seed
-
+        
         self.batch_size = batch_size
         self.epochs = epochs
         
@@ -192,7 +195,6 @@ class Pusher:
         if not os.path.exists(metafile):
 
             meta = {
-                "seed" : self.seed,
                 "device" : self.device,
                 "save_n" : self.save_n,
                 "epochs" : self.epochs,
@@ -208,13 +210,13 @@ class Pusher:
                 json.dump(meta, f)
     
 
-    def _reset_env(self):
+    def _reset_env(self, seed:int =-1):
         
-        if self.seed != -1:
-            state, _ = self.env.reset(seed=self.seed)
+        if seed == -1:
+            state, _ = self.env.reset()
             return state
         else:
-            state, _ = self.env.reset()
+            state, _ = self.env.reset(seed=seed)
             return state
 
 
@@ -298,21 +300,22 @@ class Pusher:
 
     def evaluate(self):
         
-        rewards = []
-        state = self._reset_env()
+        rewards = 0
+        for i in range(10):
+        
+            state = self._reset_env(seed=i)
+            while True:
 
-        while True:
+                action = self.action(state, add_noise=False)
 
-            action = self.action(state, add_noise=False)
+                state, reward, terminated, truncated, info = self.env.step(action)
 
-            state, reward, terminated, truncated, info = self.env.step(action)
+                rewards += reward
 
-            rewards.append(reward)
+                if terminated or truncated:
+                    break
 
-            if terminated or truncated:
-                break
-
-        return float(np.mean(rewards))
+        return rewards/10
     
 
     def train(self):
@@ -371,11 +374,11 @@ class Pusher:
                     break
             
             if self.save_n != -1:
-                if i % self.save_n == 0 and i != 0:
-                    self._save_model(epoch=i)
+                if (i+1) % self.save_n == 0 and i != 0:
+                    self._save_model(epoch=i+1)
                 
             self._write_csv(actor_loss, critic_loss, self.evaluate())
-            
+        
 
 
 
@@ -383,7 +386,6 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--seed", type=int)
     parser.add_argument("--device", type=str)
     parser.add_argument("--epochs", type=int)
     parser.add_argument("--save_n", type=int)
@@ -395,7 +397,6 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    seed = args.seed # which seed (track)
     device = args.device # cpu or cuda
     epochs = args.epochs # episodes
     save_n = args.save_n # how often to save
@@ -405,8 +406,7 @@ if __name__ == "__main__":
     render = args.render # render or not
     max_episode_steps = args.max_episode_steps # max steps per episode
     
-    pusher = Pusher(seed=seed, 
-                    device=device,
+    pusher = Pusher(device=device,
                     epochs=epochs,
                     batch_size=batch_size,
                     run_name=run_name, 
