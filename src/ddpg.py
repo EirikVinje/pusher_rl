@@ -12,11 +12,11 @@ import torch
 
 
 class OrnsteinUhlenbeckProcess:
-    def __init__(self, size):
+    def __init__(self, size, theta=0.15, sigma=0.2, decay_rate=0.0001):
         self.size = size
-        self.theta = 0.15
-        self.sigma = 0.2
-        self.decay_rate = 0.0000002
+        self.theta = theta
+        self.sigma = sigma
+        self.decay_rate = decay_rate
         self.reset()
         self.time_step = 0
 
@@ -24,12 +24,17 @@ class OrnsteinUhlenbeckProcess:
         self.state = np.zeros(self.size)
         self.time_step = 0
 
-    def sample(self):
+    def sample(self, step:bool=True):
         x = self.state
+
         decayed_sigma = self.sigma * np.exp(-self.decay_rate * self.time_step)
+        
         dx = self.theta * (np.zeros(self.size) - x) + decayed_sigma * np.random.randn(self.size)
         self.state = x + dx
-        self.time_step += 1
+        
+        if step:
+            self.time_step += 1
+        
         return dx
 
 
@@ -225,7 +230,7 @@ class Pusher:
             action = action.detach().cpu().numpy().reshape(7,)
 
         if add_noise:
-            noise = self.ornstein.sample()
+            noise = self.ornstein.sample(step=False)
             action += noise
             action = np.clip(action, -2, 2)
             
@@ -275,14 +280,14 @@ class Pusher:
 
         self.csv_file_per_ep = os.path.join(self.rundir, f"{self.run_name}_metrics_per_ep.csv")
 
-        with open(self.csv_file, 'w', newline='') as file:  
+        with open(self.csv_file_per_ep, 'w', newline='') as file:  
             writer = csv.writer(file)
             headers = ['actor_loss', 'critic_loss', 'rewards'] 
             writer.writerow(headers)
         
         self.csv_file_rewards = os.path.join(self.rundir, f"{self.run_name}_metrics_rewards.csv")
 
-        with open(self.csv_file, 'w', newline='') as file:  
+        with open(self.csv_file_rewards, 'w', newline='') as file:  
             writer = csv.writer(file)
             headers = ['reward', 'episode'] 
             writer.writerow(headers)
@@ -290,18 +295,17 @@ class Pusher:
     
     def _write_csv_per_ep(self, actor_loss, critic_loss, reward):
 
-        with open(self.csv_file, 'a', newline='') as file:
+        with open(self.csv_file_per_ep, 'a', newline='') as file:
             writer = csv.writer(file) 
             writer.writerow([actor_loss, critic_loss, reward])
 
 
     def _write_csv_reward(self, reward, episode):
 
-        with open(self.csv_file, 'a', newline='') as file:
+        with open(self.csv_file_rewards, 'a', newline='') as file:
             writer = csv.writer(file) 
             writer.writerow([reward, episode])
     
-
 
     def evaluate(self):
         
@@ -392,9 +396,11 @@ class Pusher:
                     self._write_csv_reward(best_reward, i+1)
                 
                 self._write_csv_per_ep(actor_loss, critic_loss, best_reward)
-            
+
                 bar.set_description("Episode {} of {}, reward : ({}, ep{})".format(i+1, self.epochs, best_reward, best_episode))
                 bar.update(1)
+
+                _ = self.ornstein.sample(step=True)
 
 
 
