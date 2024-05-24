@@ -188,7 +188,6 @@ class Pusher:
 
             meta = {
                 "device" : self.device,
-                "save_n" : self.save_n,
                 "epochs" : self.epochs,
                 "batch_size" : self.batch_size,
                 "max_episode_steps" : max_episode_steps,
@@ -317,7 +316,7 @@ class Pusher:
 
         with tqdm(total=self.epochs) as bar:
 
-            bar.set_description("Episode {} of {}, reward : ({}, ep{})".format(i, self.epochs, "-inf", 0))
+            bar.set_description("Episode 1 of {}, reward : ({}, ep{})".format(self.epochs, "-inf", 0))
             
             for i in range(self.epochs):
 
@@ -373,12 +372,12 @@ class Pusher:
 
                 if reward > best_reward:
                     best_reward = reward
-                    best_episode = i
+                    best_episode = i+1
                     self._save_model(epoch=0)
-
-                self._write_csv(actor_loss, critic_loss, reward)
+                
+                self._write_csv(actor_loss, critic_loss, best_reward)
             
-                bar.set_description("Episode {} of {}, reward : ({}, ep{})".format(i, self.epochs, best_reward, best_episode))
+                bar.set_description("Episode {} of {}, reward : ({}, ep{})".format(i+1, self.epochs, best_reward, best_episode))
                 bar.update(1)
 
 
@@ -392,7 +391,6 @@ if __name__ == "__main__":
     parser.add_argument("--run_name", type=str)
     parser.add_argument("--batch_size", type=int)
     parser.add_argument("--memory", type=int)
-    parser.add_argument("--render", type=int)
     parser.add_argument("--max_episode_steps", type=int)
 
     args = parser.parse_args()
@@ -402,7 +400,6 @@ if __name__ == "__main__":
     run_name = args.run_name # name of run directory to save
     batch_size = args.batch_size # batch size
     memory = args.memory # memory size
-    render = args.render # render or not
     max_episode_steps = args.max_episode_steps # max steps per episode
     
     pusher = Pusher(device=device,
