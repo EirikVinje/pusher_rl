@@ -126,20 +126,17 @@ class Memory:
 class Pusher:
     def __init__(self, 
                  run_name : str,
-                 save_n : int,
                  device : str, 
                  epochs : int, 
                  batch_size : int,
-                 render : bool,
                  memory_size : int,
                  max_episode_steps : int,
                  lr : float = 0.0001,
                  tau : float = 0.001, 
-                 gamma : float = 0.90,
-                 checkpoint = None):
+                 gamma : float = 0.90
+                ):
         
         self.run_name = run_name
-        self.save_n = save_n
         self.device = device
         
         self.batch_size = batch_size
@@ -148,12 +145,7 @@ class Pusher:
         self.n_action = 7
         self.n_state = 23
         
-        if render:
-            render = "human"
-        else:
-            render = "rgb_array"
-
-        self.env = gym.make("Pusher-v4", render_mode=render, max_episode_steps=max_episode_steps)
+        self.env = gym.make("Pusher-v4", render_mode="rgb_array", max_episode_steps=max_episode_steps)
         
         self.memory = Memory(memory_size)
 
@@ -311,6 +303,7 @@ class Pusher:
 
                 if terminated or truncated:
                     rewards.append(reward)
+                    break
                 
         return float(np.mean(rewards))
 
@@ -320,11 +313,12 @@ class Pusher:
         self._init_csv()
 
         best_reward = -100000
+        best_episode = -1
 
         with tqdm(total=self.epochs) as bar:
 
-            bar.set_description("Episode 1 of {}".format(self.epochs))
-
+            bar.set_description("Episode {} of {}, reward : ({}, ep{})".format(i, self.epochs, "-inf", 0))
+            
             for i in range(self.epochs):
 
                 state = self._reset_env()
@@ -379,11 +373,12 @@ class Pusher:
 
                 if reward > best_reward:
                     best_reward = reward
+                    best_episode = i
                     self._save_model(epoch=0)
 
                 self._write_csv(actor_loss, critic_loss, reward)
             
-                bar.set_description("Episode {} of {}, reward : {}".format(i, self.epochs, best_reward))
+                bar.set_description("Episode {} of {}, reward : ({}, ep{})".format(i, self.epochs, best_reward, best_episode))
                 bar.update(1)
 
 
@@ -394,7 +389,6 @@ if __name__ == "__main__":
 
     parser.add_argument("--device", type=str)
     parser.add_argument("--epochs", type=int)
-    parser.add_argument("--save_n", type=int)
     parser.add_argument("--run_name", type=str)
     parser.add_argument("--batch_size", type=int)
     parser.add_argument("--memory", type=int)
@@ -405,7 +399,6 @@ if __name__ == "__main__":
 
     device = args.device # cpu or cuda
     epochs = args.epochs # episodes
-    save_n = args.save_n # how often to save
     run_name = args.run_name # name of run directory to save
     batch_size = args.batch_size # batch size
     memory = args.memory # memory size
@@ -416,9 +409,7 @@ if __name__ == "__main__":
                     epochs=epochs,
                     batch_size=batch_size,
                     run_name=run_name, 
-                    save_n=save_n,
                     memory_size=memory,
-                    render=render,
                     max_episode_steps=max_episode_steps)
     
     pusher.train()
