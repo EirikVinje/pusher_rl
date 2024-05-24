@@ -16,7 +16,7 @@ class OrnsteinUhlenbeckProcess:
         self.size = size
         self.theta = 0.15
         self.sigma = 0.2
-        self.decay_rate = 0.00005
+        self.decay_rate = 0.0000002
         self.reset()
         self.time_step = 0
 
@@ -220,7 +220,7 @@ class Pusher:
             return state
 
 
-    def action(self, state):
+    def action(self, state, add_noise : bool):
 
         state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
         
@@ -233,10 +233,11 @@ class Pusher:
         elif self.device == "cuda":
             action = action.detach().cpu().numpy().reshape(7,)
 
-        noise = self.ornstein.sample()
-        action += noise
-        action = np.clip(action, -2, 2)
-        
+        if add_noise:
+            noise = self.ornstein.sample()
+            action += noise
+            action = np.clip(action, -2, 2)
+            
         return action
 
         
@@ -298,79 +299,92 @@ class Pusher:
 
     def evaluate(self):
         
-        state = self._reset_env()
-        while True:
+        rewards = []
+        for seed in range(10):
 
-            action = self.action(state, add_noise=False)
+            state = self._reset_env(seed=seed)
+            while True:
 
-            state, reward, terminated, truncated, info = self.env.step(action)
+                action = self.action(state, add_noise=False)
 
-            if terminated or truncated:
-                return reward
+                state, reward, terminated, truncated, info = self.env.step(action)
+
+                if terminated or truncated:
+                    rewards.append(reward)
+                
+        return float(np.mean(rewards))
 
 
     def train(self):
 
         self._init_csv()
 
-        for i in tqdm(range(self.epochs), desc="Episode"):
+        best_reward = -100000
 
-            state = self._reset_env()
+        with tqdm(total=self.epochs) as bar:
 
-            actor_loss = 0
-            critic_loss = 0
+            bar.set_description("Episode 1 of {}".format(self.epochs))
 
-            while True: # stops after set steps in declared env
+            for i in range(self.epochs):
+
+                state = self._reset_env()
+
+                actor_loss = 0
+                critic_loss = 0
+
+                while True: # stops after set steps in declared env
+                    
+                    # get action
+                    action = self.action(state, add_noise=True)
+
+                    # take action
+                    observation, reward, terminated, truncated, info = self.env.step(action)            
+
+                    # if terminated or truncated then reset
+                    if truncated or terminated:
+                        next_state = None
+                    else:
+                        next_state = observation
+
+                    # store in memory
+                    self.memory.add(state, action, next_state, reward)
+
+                    # move to next state
+                    state = next_state
+                    
+                    batch = self.memory.sample(self.batch_size)
+                    
+                    if batch is not None:
+                        actor_loss, critic_loss = self.do_step(batch)
+
+                        actor_loss += actor_loss
+                        critic_loss += critic_loss
+
+                        # update critic target networks
+                        target_params = self.critic_target_net.state_dict()
+                        current_params = self.critic_net.state_dict()
+                        for name, param in target_params.items():
+                            param.data.copy_(self.tau * current_params[name].data + (1 - self.tau) * param.data)
+
+                        # update actor target networks
+                        target_params = self.actor_target_net.state_dict()
+                        current_params = self.actor_net.state_dict()
+                        for name, param in target_params.items():
+                            param.data.copy_(self.tau * current_params[name].data + (1 - self.tau) * param.data)
+
+                    if state is None:
+                        break
                 
-                # get action
-                action = self.action(state)
+                reward = self.evaluate()
 
-                # take action
-                observation, reward, terminated, truncated, info = self.env.step(action)            
+                if reward > best_reward:
+                    best_reward = reward
+                    self._save_model(epoch=0)
 
-                # if terminated or truncated then reset
-                if truncated or terminated:
-                    next_state = None
-                else:
-                    next_state = observation
-
-                # store in memory
-                self.memory.add(state, action, next_state, reward)
-
-                # move to next state
-                state = next_state
-                
-                batch = self.memory.sample(self.batch_size)
-                
-                if batch is not None:
-                    actor_loss, critic_loss = self.do_step(batch)
-
-                    actor_loss += actor_loss
-                    critic_loss += critic_loss
-
-                    # update critic target networks
-                    target_params = self.critic_target_net.state_dict()
-                    current_params = self.critic_net.state_dict()
-                    for name, param in target_params.items():
-                        param.data.copy_(self.tau * current_params[name].data + (1 - self.tau) * param.data)
-
-                    # update actor target networks
-                    target_params = self.actor_target_net.state_dict()
-                    current_params = self.actor_net.state_dict()
-                    for name, param in target_params.items():
-                        param.data.copy_(self.tau * current_params[name].data + (1 - self.tau) * param.data)
-
-                if state is None:
-                    break
+                self._write_csv(actor_loss, critic_loss, reward)
             
-            if self.save_n != -1:
-                if (i+1) % self.save_n == 0 and i != 0:
-                    self._save_model(epoch=i+1)
-            
-            reward = self.evaluate()
-
-            self._write_csv(actor_loss, critic_loss, reward)
-        
+                bar.set_description("Episode {} of {}, reward : {}".format(i, self.epochs, best_reward))
+                bar.update(1)
 
 
 
