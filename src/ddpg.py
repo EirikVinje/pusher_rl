@@ -273,20 +273,35 @@ class Pusher:
     
     def _init_csv(self):
 
-        self.csv_file = os.path.join(self.rundir, f"{self.run_name}_metrics.csv")
+        self.csv_file_per_ep = os.path.join(self.rundir, f"{self.run_name}_metrics_per_ep.csv")
 
         with open(self.csv_file, 'w', newline='') as file:  
             writer = csv.writer(file)
             headers = ['actor_loss', 'critic_loss', 'rewards'] 
             writer.writerow(headers)
+        
+        self.csv_file_rewards = os.path.join(self.rundir, f"{self.run_name}_metrics_rewards.csv")
+
+        with open(self.csv_file, 'w', newline='') as file:  
+            writer = csv.writer(file)
+            headers = ['reward', 'episode'] 
+            writer.writerow(headers)
 
     
-    def _write_csv(self, actor_loss, critic_loss, reward):
+    def _write_csv_per_ep(self, actor_loss, critic_loss, reward):
 
         with open(self.csv_file, 'a', newline='') as file:
             writer = csv.writer(file) 
             writer.writerow([actor_loss, critic_loss, reward])
-        
+
+
+    def _write_csv_reward(self, reward, episode):
+
+        with open(self.csv_file, 'a', newline='') as file:
+            writer = csv.writer(file) 
+            writer.writerow([reward, episode])
+    
+
 
     def evaluate(self):
         
@@ -374,8 +389,9 @@ class Pusher:
                     best_reward = reward
                     best_episode = i+1
                     self._save_model(epoch=0)
+                    self._write_csv_reward(best_reward, i+1)
                 
-                self._write_csv(actor_loss, critic_loss, best_reward)
+                self._write_csv_per_ep(actor_loss, critic_loss, best_reward)
             
                 bar.set_description("Episode {} of {}, reward : ({}, ep{})".format(i+1, self.epochs, best_reward, best_episode))
                 bar.update(1)
