@@ -1,5 +1,6 @@
 from collections import deque
 import argparse
+import time
 import json
 import csv
 import os
@@ -25,10 +26,9 @@ class OrnsteinUhlenbeckProcess:
         self.time_step = 0
 
     def sample(self, step:bool=True):
-        x = self.state
 
+        x = self.state
         decayed_sigma = self.sigma * np.exp(-self.decay_rate * self.time_step)
-        
         dx = self.theta * (np.zeros(self.size) - x) + decayed_sigma * np.random.randn(self.size)
         self.state = x + dx
         
@@ -97,24 +97,45 @@ class Memory:
     def add(self, state, action, next_state, reward):
         self.memory.append([state, action, next_state, reward])
     
+    # def sample(self, batch_size):
+        
+    #     if batch_size > self.size():
+    #         return None
+        
+    #     idx = np.random.choice(range(self.size()), batch_size, replace=False)
+        
+    #     batch = [self.memory[i] for i in idx]
 
+    #     not_terminated_idx = [i for i, x in enumerate([x[2] for x in batch]) if not isinstance(x, type(None))]
+
+    #     states = [batch[i][0] for i in not_terminated_idx]
+    #     actions = [batch[i][1] for i in not_terminated_idx]
+    #     next_states = [batch[i][2] for i in not_terminated_idx]
+    #     rewards = [batch[i][3] for i in not_terminated_idx]
+
+    #     assert len([x for x in next_states if x is None]) == 0, next_states
+
+    #     states = np.array(states, dtype=np.float32)
+    #     actions = np.array(actions, dtype=np.float32)
+    #     next_states = np.array(next_states, dtype=np.float32)
+    #     rewards = np.array(rewards, dtype=np.float32)
+
+    #     return [states, actions, next_states, rewards]
+    
     def sample(self, batch_size):
         
         if batch_size > self.size():
             return None
-        
+
         idx = np.random.choice(range(self.size()), batch_size, replace=False)
-        
+
         batch = [self.memory[i] for i in idx]
 
-        not_terminated_idx = [i for i, x in enumerate([x[2] for x in batch]) if not isinstance(x, type(None))]
+        not_terminated_idx = [i for i, x in enumerate(batch) if x[2] is not None]
 
-        states = [batch[i][0] for i in not_terminated_idx]
-        actions = [batch[i][1] for i in not_terminated_idx]
-        next_states = [batch[i][2] for i in not_terminated_idx]
-        rewards = [batch[i][3] for i in not_terminated_idx]
+        batch = [[batch[i][j] for i in not_terminated_idx] for j in range(4)]
 
-        assert len([x for x in next_states if x is None]) == 0, next_states
+        states, actions, next_states, rewards = batch
 
         states = np.array(states, dtype=np.float32)
         actions = np.array(actions, dtype=np.float32)
@@ -122,7 +143,7 @@ class Memory:
         rewards = np.array(rewards, dtype=np.float32)
 
         return [states, actions, next_states, rewards]
-    
+
 
     def size(self):
         return len(self.memory)
@@ -150,7 +171,9 @@ class Pusher:
         self.n_action = 7
         self.n_state = 23
         
-        self.env = gym.make("Pusher-v4", render_mode="rgb_array", max_episode_steps=max_episode_steps)
+        self.max_episode_steps = max_episode_steps
+
+        self.env = gym.make("Pusher-v4", render_mode="rgb_array", max_episode_steps=self.max_episode_steps)
         
         self.memory = Memory(memory_size)
 
@@ -291,6 +314,13 @@ class Pusher:
             writer = csv.writer(file)
             headers = ['reward', 'episode'] 
             writer.writerow(headers)
+        
+        self.csv_file_dt = os.path.join(self.rundir, f"{self.run_name}_metrics_time.csv")
+
+        with open(self.csv_file_dt, 'w', newline='') as file:  
+            writer = csv.writer(file)
+            headers = ['time', 'episode'] 
+            writer.writerow(headers)
 
     
     def _write_csv_per_ep(self, actor_loss, critic_loss, reward):
@@ -306,6 +336,13 @@ class Pusher:
             writer = csv.writer(file) 
             writer.writerow([reward, episode])
     
+
+    def _write_csv_time(self, delta_time, episode):
+
+        with open(self.csv_file_dt, 'a', newline='') as file:
+            writer = csv.writer(file) 
+            writer.writerow([delta_time, episode])
+
 
     def evaluate(self):
         
@@ -332,20 +369,22 @@ class Pusher:
 
         best_reward = -100000
         best_episode = -1
+        
+        total_steps = self.epochs
 
-        with tqdm(total=self.epochs) as bar:
+        with tqdm(total=total_steps) as bar:
 
-            bar.set_description("Episode 1 of {}, reward : ({}, ep{})".format(self.epochs, "-inf", 0))
+            bar.set_description("best episode : ({}, 0)".format(best_reward))
             
             for i in range(self.epochs):
-
-                state = self._reset_env()
-
+                
+                start_t = time.time()
                 actor_loss = 0
                 critic_loss = 0
+                state = self._reset_env()
 
-                while True: # stops after set steps in declared env
-                    
+                while True:
+
                     # get action
                     action = self.action(state, add_noise=True)
 
@@ -364,13 +403,16 @@ class Pusher:
                     # move to next state
                     state = next_state
                     
+                    # sample a batch
                     batch = self.memory.sample(self.batch_size)
                     
+                    # run updates if memory size >= batch size
                     if batch is not None:
-                        actor_loss, critic_loss = self.do_step(batch)
-
-                        actor_loss += actor_loss
-                        critic_loss += critic_loss
+                        
+                        # update actor and critic
+                        al, cl = self.do_step(batch)
+                        actor_loss =+ al
+                        critic_loss = cl
 
                         # update critic target networks
                         target_params = self.critic_target_net.state_dict()
@@ -383,7 +425,7 @@ class Pusher:
                         current_params = self.actor_net.state_dict()
                         for name, param in target_params.items():
                             param.data.copy_(self.tau * current_params[name].data + (1 - self.tau) * param.data)
-
+                    
                     if state is None:
                         break
                 
@@ -391,17 +433,18 @@ class Pusher:
 
                 if reward > best_reward:
                     best_reward = reward
-                    best_episode = i+1
+                    best_episode = i
                     self._save_model(epoch=0)
-                    self._write_csv_reward(best_reward, i+1)
-                
-                self._write_csv_per_ep(actor_loss, critic_loss, best_reward)
+                    self._write_csv_reward(best_reward, i)
+                else:
+                    self._write_csv_reward(best_reward, i)
 
-                bar.set_description("Episode {} of {}, reward : ({}, ep{})".format(i+1, self.epochs, best_reward, best_episode))
+                self._write_csv_per_ep(actor_loss, critic_loss, reward)
+
+                bar.set_description("best episode : ({}, {})".format(best_reward, best_episode))
                 bar.update(1)
 
-                _ = self.ornstein.sample(step=True)
-
+                self._write_csv_time(start_t-time.time(), i)
 
 
 if __name__ == "__main__":
