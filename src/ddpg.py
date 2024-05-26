@@ -13,28 +13,19 @@ import torch
 
 
 class OrnsteinUhlenbeckProcess:
-    def __init__(self, size, theta=0.15, sigma=0.2, decay_rate=0.0001):
+    def __init__(self, size, theta=0.15, sigma=0.2):
         self.size = size
         self.theta = theta
         self.sigma = sigma
-        self.decay_rate = decay_rate
         self.reset()
-        self.time_step = 0
 
     def reset(self):
         self.state = np.zeros(self.size)
-        self.time_step = 0
 
-    def sample(self, step:bool=True):
-
+    def sample(self):
         x = self.state
-        decayed_sigma = self.sigma * np.exp(-self.decay_rate * self.time_step)
-        dx = self.theta * (np.zeros(self.size) - x) + decayed_sigma * np.random.randn(self.size)
+        dx = self.theta * (np.zeros(self.size) - x) + self.sigma * np.random.randn(self.size)
         self.state = x + dx
-        
-        if step:
-            self.time_step += 1
-        
         return dx
 
 
@@ -97,31 +88,6 @@ class Memory:
     def add(self, state, action, next_state, reward):
         self.memory.append([state, action, next_state, reward])
     
-    # def sample(self, batch_size):
-        
-    #     if batch_size > self.size():
-    #         return None
-        
-    #     idx = np.random.choice(range(self.size()), batch_size, replace=False)
-        
-    #     batch = [self.memory[i] for i in idx]
-
-    #     not_terminated_idx = [i for i, x in enumerate([x[2] for x in batch]) if not isinstance(x, type(None))]
-
-    #     states = [batch[i][0] for i in not_terminated_idx]
-    #     actions = [batch[i][1] for i in not_terminated_idx]
-    #     next_states = [batch[i][2] for i in not_terminated_idx]
-    #     rewards = [batch[i][3] for i in not_terminated_idx]
-
-    #     assert len([x for x in next_states if x is None]) == 0, next_states
-
-    #     states = np.array(states, dtype=np.float32)
-    #     actions = np.array(actions, dtype=np.float32)
-    #     next_states = np.array(next_states, dtype=np.float32)
-    #     rewards = np.array(rewards, dtype=np.float32)
-
-    #     return [states, actions, next_states, rewards]
-    
     def sample(self, batch_size):
         
         if batch_size > self.size():
@@ -152,18 +118,20 @@ class Memory:
 class Pusher:
     def __init__(self, 
                  run_name : str,
-                 device : str, 
                  epochs : int, 
                  batch_size : int,
                  memory_size : int,
                  max_episode_steps : int,
                  lr : float = 0.0001,
                  tau : float = 0.001, 
-                 gamma : float = 0.90
+                 gamma : float = 0.90,
+                 device : str = "cuda",
+                 record : bool = True
                 ):
         
         self.run_name = run_name
         self.device = device
+        self.record = record
         
         self.batch_size = batch_size
         self.epochs = epochs
@@ -253,7 +221,7 @@ class Pusher:
             action = action.detach().cpu().numpy().reshape(7,)
 
         if add_noise:
-            noise = self.ornstein.sample(step=False)
+            noise = self.ornstein.sample()
             action += noise
             action = np.clip(action, -2, 2)
             
@@ -368,83 +336,96 @@ class Pusher:
         self._init_csv()
 
         best_reward = -100000
-        best_episode = -1
+        best_step = -1
+        actor_loss = 0
+        critic_loss = 0
+        total_steps = self.epochs*self.max_episode_steps
         
-        total_steps = self.epochs
-
+        state = self._reset_env()
+        
         with tqdm(total=total_steps) as bar:
-
-            bar.set_description("best episode : ({}, 0)".format(best_reward))
             
-            for i in range(self.epochs):
+            bar.set_description("best : (0, {}, 0.00, 0.00)".format(best_reward))
+            
+            for i in range(total_steps):
                 
                 start_t = time.time()
-                actor_loss = 0
-                critic_loss = 0
-                state = self._reset_env()
-
-                while True:
-
-                    # get action
-                    action = self.action(state, add_noise=True)
-
-                    # take action
-                    observation, reward, terminated, truncated, info = self.env.step(action)            
-
-                    # if terminated or truncated then reset
-                    if truncated or terminated:
-                        next_state = None
-                    else:
-                        next_state = observation
-
-                    # store in memory
-                    self.memory.add(state, action, next_state, reward)
-
-                    # move to next state
-                    state = next_state
-                    
-                    # sample a batch
-                    batch = self.memory.sample(self.batch_size)
-                    
-                    # run updates if memory size >= batch size
-                    if batch is not None:
-                        
-                        # update actor and critic
-                        al, cl = self.do_step(batch)
-                        actor_loss =+ al
-                        critic_loss = cl
-
-                        # update critic target networks
-                        target_params = self.critic_target_net.state_dict()
-                        current_params = self.critic_net.state_dict()
-                        for name, param in target_params.items():
-                            param.data.copy_(self.tau * current_params[name].data + (1 - self.tau) * param.data)
-
-                        # update actor target networks
-                        target_params = self.actor_target_net.state_dict()
-                        current_params = self.actor_net.state_dict()
-                        for name, param in target_params.items():
-                            param.data.copy_(self.tau * current_params[name].data + (1 - self.tau) * param.data)
-                    
-                    if state is None:
-                        break
                 
-                reward = self.evaluate()
+                # get action
+                action = self.action(state, add_noise=True)
 
-                if reward > best_reward:
-                    best_reward = reward
-                    best_episode = i
-                    self._save_model(epoch=0)
-                    self._write_csv_reward(best_reward, i)
+                # take action
+                observation, reward, terminated, truncated, info = self.env.step(action)            
+
+                # if terminated or truncated then reset
+                if truncated or terminated:
+                    next_state = None
                 else:
-                    self._write_csv_reward(best_reward, i)
+                    next_state = observation
 
-                self._write_csv_per_ep(actor_loss, critic_loss, reward)
+                # store in memory
+                self.memory.add(state, action, next_state, reward)
 
-                bar.set_description("best episode : ({}, {})".format(best_reward, best_episode))
+                # move to next state
+                state = next_state
+                
+                # sample a batch
+                batch = self.memory.sample(self.batch_size)
+                
+                # run updates if memory size >= batch size
+                if batch is not None:
+                    
+                    # update actor and critic
+                    al, cl = self.do_step(batch)
+                    actor_loss = al
+                    critic_loss = cl
+
+                    # update critic target networks
+                    target_params = self.critic_target_net.state_dict()
+                    current_params = self.critic_net.state_dict()
+                    for name, param in target_params.items():
+                        param.data.copy_(self.tau * current_params[name].data + (1 - self.tau) * param.data)
+
+                    # update actor target networks
+                    target_params = self.actor_target_net.state_dict()
+                    current_params = self.actor_net.state_dict()
+                    for name, param in target_params.items():
+                        param.data.copy_(self.tau * current_params[name].data + (1 - self.tau) * param.data)
+                
+                if i % 100 == 0:
+
+                    reward = self.evaluate()
+                    if reward > best_reward and not self.record:
+                        best_reward = reward
+                        best_step = i
+                    
+                    elif reward > best_reward and self.record:
+                        best_reward = reward
+                        best_step = i
+                        self._save_model(epoch=0)
+                        self._write_csv_reward(best_reward, i)
+                    
+                    elif self.record:
+                        self._write_csv_reward(best_reward, i)
+                        self._write_csv_per_ep(actor_loss, critic_loss, reward)
+                        self._write_csv_time(start_t-time.time(), i)
+            
+                if state is None:   
+                    state = self._reset_env()
+                    
+                bar.set_description("best : ({}, {}, {}, {})".format(best_step, round(best_reward,2), round(actor_loss,2), round(critic_loss,2)))
                 bar.update(1)
 
-                self._write_csv_time(start_t-time.time(), i)
+        return best_reward
+
+
+                
+                
+
+                
+
+                
+
 
 
 if __name__ == "__main__":
