@@ -135,7 +135,7 @@ class Pusher:
         
         self.batch_size = batch_size
         self.epochs = epochs
-        
+    
         self.n_action = 7
         self.n_state = 23
         
@@ -162,39 +162,39 @@ class Pusher:
 
         self.ornstein = OrnsteinUhlenbeckProcess(size=self.n_action)
 
-        user = os.environ.get("USER")
-        
-        root = f"/home/{user}/data"
-        if not os.path.exists(root):
-            os.mkdir(root)
-        
-        pusherdir = os.path.join(root, "pusher_models")
-        if not os.path.exists(pusherdir):
-            os.mkdir(pusherdir)
+        if self.record:
+            user = os.environ.get("USER")        
+            root = f"/home/{user}/data"
+            if not os.path.exists(root):
+                os.mkdir(root)
+            
+            pusherdir = os.path.join(root, "pusher_models")
+            if not os.path.exists(pusherdir):
+                os.mkdir(pusherdir)
 
-        self.rundir = os.path.join(pusherdir, self.run_name)
-        if not os.path.exists(self.rundir):
-            os.mkdir(self.rundir)
+            self.rundir = os.path.join(pusherdir, self.run_name)
+            if not os.path.exists(self.rundir):
+                os.mkdir(self.rundir)
 
-        elif len(os.listdir(self.rundir)) != 0:
-            assert False, "run dir already exists, create a new one or empty the old one"
-        
-        metafile = os.path.join(self.rundir, f"meta_{self.run_name}.json")
-        if not os.path.exists(metafile):
+            elif len(os.listdir(self.rundir)) != 0:
+                assert False, "run dir already exists, create a new one or empty the old one"
+            
+            metafile = os.path.join(self.rundir, f"meta_{self.run_name}.json")
+            if not os.path.exists(metafile):
 
-            meta = {
-                "device" : self.device,
-                "epochs" : self.epochs,
-                "batch_size" : self.batch_size,
-                "max_episode_steps" : max_episode_steps,
-                "lr" : lr,
-                "tau" : tau,
-                "gamma" : gamma,
-                "memory_size" : memory_size
-            }
+                meta = {
+                    "device" : self.device,
+                    "epochs" : self.epochs,
+                    "batch_size" : self.batch_size,
+                    "max_episode_steps" : max_episode_steps,
+                    "lr" : lr,
+                    "tau" : tau,
+                    "gamma" : gamma,
+                    "memory_size" : memory_size
+                }
 
-            with open(metafile, "w") as f:
-                json.dump(meta, f)
+                with open(metafile, "w") as f:
+                    json.dump(meta, f)
     
 
     def _reset_env(self, seed:int =-1):
@@ -314,118 +314,92 @@ class Pusher:
 
     def evaluate(self):
         
-        rewards = []
-        for seed in range(10):
+        state = self._reset_env()
+        while True:
 
-            state = self._reset_env(seed=seed)
-            while True:
-
-                action = self.action(state, add_noise=False)
-
-                state, reward, terminated, truncated, info = self.env.step(action)
-
-                if terminated or truncated:
-                    rewards.append(reward)
-                    break
-                
-        return float(np.mean(rewards))
+            action = self.action(state, add_noise=False)
+            state, reward, terminated, truncated, info = self.env.step(action)
+            if terminated or truncated:
+                return reward
 
 
     def train(self):
 
-        self._init_csv()
+        if self.record:
+            self._init_csv()
 
         best_reward = -100000
         best_step = -1
         actor_loss = 0
         critic_loss = 0
-        total_steps = self.epochs*self.max_episode_steps
         
         state = self._reset_env()
-        
-        with tqdm(total=total_steps) as bar:
+        self.reward_que = deque([], maxlen=10)
+
+        with tqdm(total=self.epochs) as bar:
             
-            bar.set_description("best : (0, {}, 0.00, 0.00)".format(best_reward))
+            bar.set_description("best : (0, {}), p.e : (0.0)".format(best_reward))
             
-            for i in range(total_steps):
+            for i in range(self.epochs):
                 
                 start_t = time.time()
                 
-                # get action
                 action = self.action(state, add_noise=True)
 
-                # take action
                 observation, reward, terminated, truncated, info = self.env.step(action)            
 
-                # if terminated or truncated then reset
                 if truncated or terminated:
                     next_state = None
                 else:
                     next_state = observation
 
-                # store in memory
                 self.memory.add(state, action, next_state, reward)
 
-                # move to next state
                 state = next_state
                 
-                # sample a batch
                 batch = self.memory.sample(self.batch_size)
                 
-                # run updates if memory size >= batch size
                 if batch is not None:
                     
-                    # update actor and critic
                     al, cl = self.do_step(batch)
                     actor_loss = al
                     critic_loss = cl
 
-                    # update critic target networks
                     target_params = self.critic_target_net.state_dict()
                     current_params = self.critic_net.state_dict()
                     for name, param in target_params.items():
                         param.data.copy_(self.tau * current_params[name].data + (1 - self.tau) * param.data)
 
-                    # update actor target networks
                     target_params = self.actor_target_net.state_dict()
                     current_params = self.actor_net.state_dict()
                     for name, param in target_params.items():
                         param.data.copy_(self.tau * current_params[name].data + (1 - self.tau) * param.data)
-                
-                if i % 100 == 0:
 
-                    reward = self.evaluate()
-                    if reward > best_reward and not self.record:
-                        best_reward = reward
-                        best_step = i
+                if i % 10 == 0:
+                    self.reward_que.append(self.evaluate())
+
+                if i % 100 == 0:
                     
-                    elif reward > best_reward and self.record:
+                    reward = float(np.mean(self.reward_que))
+
+                    if reward > best_reward:
                         best_reward = reward
-                        best_step = i
-                        self._save_model(epoch=0)
-                        self._write_csv_reward(best_reward, i)
+                        best_step = i  
                     
-                    elif self.record:
+                    if self.record:
                         self._write_csv_reward(best_reward, i)
                         self._write_csv_per_ep(actor_loss, critic_loss, reward)
-                        self._write_csv_time(start_t-time.time(), i)
-            
+                        
+                end_t = time.time()
+
+                bar.set_description("best : ({}, {}) p.e : ({}s)".format(best_step, round(best_reward,2), round(end_t-start_t,3)))
+                bar.update(1)
+
                 if state is None:   
                     state = self._reset_env()
                     
-                bar.set_description("best : ({}, {}, {}, {})".format(best_step, round(best_reward,2), round(actor_loss,2), round(critic_loss,2)))
-                bar.update(1)
-
+                
         return best_reward
-
-
-                
-                
-
-                
-
-                
-
 
 
 if __name__ == "__main__":
@@ -438,6 +412,7 @@ if __name__ == "__main__":
     parser.add_argument("--batch_size", type=int)
     parser.add_argument("--memory", type=int)
     parser.add_argument("--max_episode_steps", type=int)
+    parser.add_argument("--record", type=int)
 
     args = parser.parse_args()
 
@@ -447,12 +422,14 @@ if __name__ == "__main__":
     batch_size = args.batch_size # batch size
     memory = args.memory # memory size
     max_episode_steps = args.max_episode_steps # max steps per episode
+    record = args.record
     
     pusher = Pusher(device=device,
                     epochs=epochs,
                     batch_size=batch_size,
                     run_name=run_name, 
                     memory_size=memory,
-                    max_episode_steps=max_episode_steps)
+                    max_episode_steps=max_episode_steps,
+                    record=record)
     
     pusher.train()
