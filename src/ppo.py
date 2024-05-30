@@ -3,9 +3,10 @@ import gymnasium as gym
 
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
+from stable_baselines3.common.callbacks import EvalCallback
 
 # Parallel environments
-env = gym.make("Pusher-v4", render_mode='rgb_array', max_episode_steps=300)
+env = gym.make("Pusher-v4", render_mode='rgb_array', max_episode_steps=200)
 vec_env = make_vec_env(lambda:env, n_envs=1)
 
 path = os.getcwd()
@@ -13,9 +14,9 @@ path = os.getcwd()
 savepath = os.path.join(path, os.pardir)
 
 #params = {'n_steps': 878, 'gamma': 0.8680218654215721, 'learning_rate': 0.00017445135385783767, 'ent_coef': 0.0011388540424663318, 'clip_range': 0.1964158980973974, 'n_epochs': 8, 'gae_lambda': 0.8124992408081275, 'max_grad_norm': 0.9961750824042535, 'vf_coef': 0.7726884965404387}
-params={'n_steps': 483, 'gamma': 0.9733319984142623, 'learning_rate': 6.249837257325398e-05, 'ent_coef': 6.2177665117053e-05, 'clip_range': 0.20674514787972498, 'n_epochs': 18, 'gae_lambda': 0.9180827852846369, 'max_grad_norm': 0.7932345709898225, 'vf_coef': 0.5888144289366819}
+#params={'n_steps': 483, 'gamma': 0.9733319984142623, 'learning_rate': 6.249837257325398e-05, 'ent_coef': 6.2177665117053e-05, 'clip_range': 0.20674514787972498, 'n_epochs': 18, 'gae_lambda': 0.9180827852846369, 'max_grad_norm': 0.7932345709898225, 'vf_coef': 0.5888144289366819}
 
-
+'''
 model = PPO("MlpPolicy", vec_env, 
             verbose=1,
             batch_size=32,
@@ -28,14 +29,20 @@ model = PPO("MlpPolicy", vec_env,
             gae_lambda=params['gae_lambda'],
             max_grad_norm=params['max_grad_norm'],
             vf_coef=params['vf_coef'],
+            tensorboard_log="./ppo_tensorboard_log/")'''
+
+eval_callback = EvalCallback(vec_env, best_model_save_path='./logs/',
+                             log_path='./logs/', eval_freq=500,
+                             deterministic=True, render=False)
+
+model = PPO("MlpPolicy", vec_env, 
+            verbose=1,
+            learning_rate=0.0001,
+            clip_range=0.2,
             tensorboard_log="./ppo_tensorboard_log/")
 
-#model = PPO("MlpPolicy", vec_env, 
-#            verbose=1,
-#            tensorboard_log="./ppo_tensorboard_log/")
-
-model.learn(total_timesteps=10_000_000,log_interval=100,progress_bar=True)
-model.save(f"{savepath}/models/ppo_10M_300step_hp")
+model.learn(total_timesteps=5_000_000,log_interval=10,progress_bar=True, callback=eval_callback)
+#model.save(f"{savepath}/models/ppo_5M_200step_standard_v2")
 
 #del model # remove to demonstrate saving and loading
 
