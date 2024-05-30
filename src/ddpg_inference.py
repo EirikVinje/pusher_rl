@@ -27,6 +27,7 @@ class Model:
     def test(self, seeds : list[int], show_progress : bool = False):
 
         rewards = []
+        success = 0
         for seed in seeds:
             
             state, info = self.env.reset(seed=int(seed))
@@ -50,30 +51,30 @@ class Model:
                     print(f"seed: {seed} :: Reward at step {i}: {reward}", end="\r")
                 
                 if terminated or truncated:
+                    if reward > -0.12:
+                        success +=1
                     break
 
                 state = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
-
                 i += 1
             
             if show_progress:
-                print()
+                print(f"seed: {seed} :: Reward at step {i}: {reward}")
 
             rewards.append(rewards_i)
 
         self.env.close()
 
-        return rewards
+        return rewards, success/len(seeds)
 
 
 if __name__ == "__main__":
     
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--render", type=int)
-    parser.add_argument("--model", type=str)
-    args = parser.parse_args()
+    root = f"/home/{os.environ["USER"]}/projects/pusher_rl/models"
+    modelname = f"max_ep_200_10000.pt"
+    modelpath = os.path.join(root, modelname)
 
-    print(args)
+    model = Model(path_model=modelpath, render=1)
+    model.test(show_progress=True)
 
-    model = Model(args.model, args.render)
-    model.test()
+    

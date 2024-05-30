@@ -84,7 +84,6 @@ class Memory:
     def __init__(self, capacity):
         self.memory = deque([], maxlen=capacity)
 
-
     def add(self, state, action, next_state, reward):
         self.memory.append([state, action, next_state, reward])
     
@@ -98,7 +97,7 @@ class Memory:
         batch = [self.memory[i] for i in idx]
 
         not_terminated_idx = [i for i, x in enumerate(batch) if x[2] is not None]
-
+        
         batch = [[batch[i][j] for i in not_terminated_idx] for j in range(4)]
 
         states, actions, next_states, rewards = batch
@@ -109,7 +108,7 @@ class Memory:
         rewards = np.array(rewards, dtype=np.float32)
 
         return [states, actions, next_states, rewards]
-
+        
 
     def size(self):
         return len(self.memory)
@@ -379,7 +378,6 @@ class Pusher:
                     self.reward_que.append(self.evaluate())
 
                 if i % 100 == 0:
-                    
                     reward = float(np.mean(self.reward_que))
 
                     if reward > best_reward:
@@ -398,7 +396,6 @@ class Pusher:
                 if state is None:   
                     state = self._reset_env()
                     
-                
         return best_reward
 
 
