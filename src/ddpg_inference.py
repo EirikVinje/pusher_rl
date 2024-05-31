@@ -70,11 +70,13 @@ class Model:
 
 if __name__ == "__main__":
     
-    root = f"/home/{os.environ["USER"]}/projects/pusher_rl/models"
+    root = f"/home/{os.environ['USER']}/projects/pusher_rl/models"
     modelname = f"max_ep_200_10000.pt"
     modelpath = os.path.join(root, modelname)
 
-    model = Model(path_model=modelpath, render=1)
-    model.test(show_progress=True)
+    seeds = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+    model = Model(path_model=modelpath, render=1, max_steps=200)
+    model.test(seeds=seeds,show_progress=True)
 
     
